@@ -136,15 +136,14 @@ class SampleProcessor(object):
         assert type(paths) == list
 
         # 1) compute discounted rewards (returns)
-        for idx, path in enumerate(paths):
-            path["returns"] = path["rewards"]
 
         # 2) fit baseline estimator using the path returns and predict the return baselines
-        self.baseline.fit(paths, target_key="returns")
-        all_path_baselines = [self.baseline.predict(path) for path in paths]
+
+        all_path_baselines_obs        = [self.baseline.predict_off_ob(path) for path in paths]
+        all_path_baselines_next_obs   = [self.baseline.predict_off_next_ob(path) for path in paths]
 
         # 3) compute advantages and adjusted rewards
-        paths = self._compute_advantages(paths, all_path_baselines)
+        paths = self._compute_advantages_off(paths, all_path_baselines_obs, all_path_baselines_next_obs)
 
         # 4) stack path data
         observations, actions, rewards, returns, advantages, env_infos, agent_infos = self._stack_path_data(paths)
@@ -197,6 +196,21 @@ class SampleProcessor(object):
 
         return paths
 
+    def _compute_advantages_off(self, paths, all_path_baselines_ob, all_path_baselines_next_ob):
+        assert len(paths) == len(all_path_baselines_ob)
+        assert len(all_path_baselines_next_ob) == len(all_path_baselines_ob)
+
+
+        for idx, path in enumerate(paths):
+            path_baselines_ob       = all_path_baselines_ob[idx]
+            path_baselines_next_ob  = all_path_baselines_next_ob[idx]
+
+            advs = path["rewards"] + \
+                     self.discount * path_baselines_next_ob- \
+                     path_baselines_ob
+            path["advantages"] = advs
+
+        return paths
 
     def _stack_path_data(self, paths):
         observations = np.concatenate([path["observations"] for path in paths])

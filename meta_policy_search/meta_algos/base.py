@@ -155,7 +155,7 @@ class MAMLAlgo(MetaAlgo):
     def _adapt_objective_sym(self, action_sym, adv_sym, dist_info_old_sym, dist_info_new_sym):
         raise NotImplementedError
 
-    def _build_inner_adaption(self):
+    def _build_inner_adaption_off(self):
         """
         Creates the symbolic graph for the one-step inner gradient update (It'll be called several times if
         more gradient steps are needed)
@@ -168,31 +168,46 @@ class MAMLAlgo(MetaAlgo):
             adapt_input_list_ph (list): list of placeholders
 
         """
-        obs_phs, action_phs, adv_phs, dist_info_old_phs, adapt_input_ph_dict = self._make_input_placeholders('adapt')
+        obs_phs,     action_phs,     adv_phs,     dist_info_old_phs,     adapt_input_ph_dict     = self._make_input_placeholders('adapt')
+
+        obs_phs_off, action_phs_off, adv_phs_off, dist_info_old_phs_off, adapt_input_ph_dict_off = self._make_input_placeholders('adapt1')
+
 
         adapted_policies_params = []
 
         for i in range(self.meta_batch_size):
             with tf.variable_scope("adapt_task_%i" % i):
                 with tf.variable_scope("adapt_objective"):
-                    distribution_info_new = self.policy.distribution_info_sym(obs_phs[i],
+                    distribution_info_new     = self.policy.distribution_info_sym(obs_phs[i],
                                                                               params=self.policy.policies_params_phs[i])
 
+
                     # inner surrogate objective
-                    surr_obj_adapt = self._adapt_objective_sym(action_phs[i], adv_phs[i],
+                    surr_obj_adapt     = self._adapt_objective_sym(action_phs[i], adv_phs[i],
                                                                dist_info_old_phs[i], distribution_info_new)
 
-                # get tf operation for adapted (post-update) policy
-                with tf.variable_scope("adapt_step"):
-                    adapted_policy_param = self._adapt_sym(surr_obj_adapt, self.policy.policies_params_phs[i])
-                adapted_policies_params.append(adapted_policy_param)
+            with tf.variable_scope("adapt1_task_%i" % i):
+                with tf.variable_scope("adapt1_objective"):
+
+                    distribution_info_new_off = self.policy.distribution_info_sym(obs_phs_off[i],
+                                                                              params=self.policy.policies_params_phs[i])
+                    
+                    # inner off_policy surrogate objective
+                    surr_obj_adapt_off = self._adapt_objective_sym_off(action_phs_off[i], adv_phs_off[i],
+                                                               dist_info_old_phs_off[i], distribution_info_new_off)  
+
+            # get tf operation for adapted (post-update) policy
+            with tf.variable_scope("adapt_step"):
+                all_surr_obj_adapt = 0.5 * surr_obj_adapt + 0.5 * surr_obj_adapt_off
+                adapted_policy_param = self._adapt_sym(surr_obj_adapt, self.policy.policies_params_phs[i])
+            adapted_policies_params.append(adapted_policy_param)
 
         return adapted_policies_params, adapt_input_ph_dict
 
 
 
 
-    def _build_inner_adaption_off(self):
+    def _build_inner_adaption(self):
         """
         Creates the symbolic graph for the one-step inner gradient update (It'll be called several times if
         more gradient steps are needed)
@@ -281,7 +296,7 @@ class MAMLAlgo(MetaAlgo):
 
 
 
-    def _adapt_off(self, samples):
+    def _adapt_off(self, on_samples, off_samples):
         """
         Performs MAML inner step for each task and stores the updated parameters in the policy
 
@@ -289,18 +304,30 @@ class MAMLAlgo(MetaAlgo):
             samples (list) : list of dicts of samples (each is a dict) split by meta task
 
         """
-        assert len(samples) == self.meta_batch_size
-        assert [sample_dict.keys() for sample_dict in samples]
+        assert len(on_samples)  == self.meta_batch_size
+        assert len(off_samples) == self.meta_batch_size
+
+        assert [sample_dict.keys() for sample_dict in on_samples]
+        assert [sample_dict.keys() for sample_dict in off_samples]
+
 
         sess = tf.get_default_session()
 
         # prepare feed dict
-        input_dict    = self._extract_input_dict(samples, self._optimization_keys, prefix='adapt')
-        input_ph_dict = self.adapt_input_ph_dict
+        input_dict_on            = self._extract_input_dict(on_samples,  self._optimization_keys, prefix='adapt')
+        input_dict_off           = self._extract_input_dict(off_samples, self._optimization_keys, prefix='adapt1')
 
-        feed_dict_inputs = utils.create_feed_dict(placeholder_dict=input_ph_dict, value_dict=input_dict)
-        feed_dict_params = self.policy.policies_params_feed_dict
+        input_dict_all       ={**input_dict_on, **input_dict_off}
 
+        input_ph_dict        = self.adapt_input_ph_dict
+
+        print(input_dict_all)
+        print(self.adapt_input_ph_dict)
+        feed_dict_inputs     = utils.create_feed_dict(placeholder_dict=input_ph_dict, value_dict=input_dict_all)
+        feed_dict_params     = self.policy.policies_params_feed_dict
+
+
+ 
         feed_dict = {**feed_dict_inputs, **feed_dict_params}  # merge the two feed dicts
 
         
@@ -360,7 +387,7 @@ class MAMLAlgo(MetaAlgo):
         Returns:
 
         """
-        assert len(all_samples_data) == self.num_inner_grad_steps + 1
+        assert len(all_samples_data) == self.num_inner_grad_steps + 2
 
         meta_op_input_dict = OrderedDict()
         for step_id, samples_data in enumerate(all_samples_data):  # these are the gradient steps

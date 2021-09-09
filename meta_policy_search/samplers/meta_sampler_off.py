@@ -33,8 +33,12 @@ class ReplayBuffer(object):
         self.next_ob_buffs     = OrderedDict()
         self.done_buffs        = OrderedDict()
 
+
+
         self.env_info_buffs    = OrderedDict()
         self.agent_info_buffs  = OrderedDict()
+
+        self.return_buffs      = OrderedDict()
 
 
 
@@ -45,6 +49,8 @@ class ReplayBuffer(object):
             self.next_ob_buffs[i] = np.zeros((self.buffer_length, ob_dim), dtype=np.float32)            
             self.done_buffs[i]    = np.zeros(self.buffer_length, dtype=np.uint8)
 
+            self.return_buffs[i]  = np.zeros(self.buffer_length, dtype=np.float32)
+
             self.env_info_buffs[i]          = dict(reward_run=np.zeros(self.buffer_length, dtype=np.float32),          reward_ctrl=np.zeros(self.buffer_length, dtype=np.float32))
             self.agent_info_buffs[i]        = dict(mean      =np.zeros((self.buffer_length, ac_dim), dtype=np.float32),log_std=np.zeros((self.buffer_length, ac_dim), dtype=np.float32))
 
@@ -53,7 +59,7 @@ class ReplayBuffer(object):
         self.curr_i  = 0    # current index to write to (ovewrite oldest data)
 
 
-    def push(self, task_id, observations, actions, rewards, next_observations, dones, env_infos, agent_infos):
+    def push(self, task_id, observations, actions, rewards, next_observations, dones, env_infos, agent_infos, returns):
         nentries = observations.shape[0]  # handle multiple parallel environments
 
 
@@ -71,6 +77,9 @@ class ReplayBuffer(object):
             self.done_buffs[task_id]     = np.roll(self.done_buffs[task_id],
                                                         rollover)
 
+            self.return_buffs[task_id]   = np.roll(self.return_buffs[task_id],
+                                                        rollover)
+
             self.env_info_buffs[task_id]['reward_run']      = np.roll(self.env_info_buffs[task_id]['reward_run'],
                                                         rollover)
             self.env_info_buffs[task_id]['reward_ctrl']     = np.roll(self.env_info_buffs[task_id]['reward_ctrl'],
@@ -79,6 +88,9 @@ class ReplayBuffer(object):
                                                         rollover, axis=0)
             self.agent_info_buffs[task_id]['log_std']       = np.roll(self.agent_info_buffs[task_id]['log_std'],
                                                         rollover, axis=0)
+
+
+
             self.curr_i = 0
             self.filled_i = self.buffer_length
 
@@ -87,6 +99,9 @@ class ReplayBuffer(object):
         self.rew_buffs[task_id][self.curr_i:self.curr_i + nentries]       = rewards
         self.next_ob_buffs[task_id][self.curr_i:self.curr_i + nentries]   = next_observations
         self.done_buffs[task_id][self.curr_i:self.curr_i + nentries]      = dones
+
+        self.return_buffs[task_id][self.curr_i:self.curr_i + nentries]    = returns
+  
 
         self.env_info_buffs[task_id]['reward_run'][self.curr_i:self.curr_i + nentries]      = env_infos['reward_run']
         self.env_info_buffs[task_id]['reward_ctrl'][self.curr_i:self.curr_i + nentries]     = env_infos['reward_ctrl']
@@ -108,13 +123,16 @@ class ReplayBuffer(object):
         for task_id in range(self.num_tasks):
             paths[task_id] = []
             paths[task_id].append(dict(
-                        observations = self.ob_buffs[task_id][inds],
-                        actions      = self.ac_buffs[task_id][inds],
-                        rewards      = self.rew_buffs[task_id][inds],
-                        env_infos    = dict(reward_run  = self.env_info_buffs[task_id]['reward_run'][inds],
-                                            reward_ctrl = self.env_info_buffs[task_id]['reward_ctrl'][inds]),
-                        agent_infos  = dict(mean        = self.agent_info_buffs[task_id]['mean'][inds],
-                                            log_std     = self.agent_info_buffs[task_id]['log_std'][inds]),
+                        observations       = self.ob_buffs[task_id][inds],
+                        actions            = self.ac_buffs[task_id][inds],
+                        rewards            = self.rew_buffs[task_id][inds],
+                        next_observations  = self.next_ob_buffs[task_id][inds],
+                        env_infos          = dict(reward_run  = self.env_info_buffs[task_id]['reward_run'][inds],
+                                                  reward_ctrl = self.env_info_buffs[task_id]['reward_ctrl'][inds]),
+                        agent_infos        = dict(mean        = self.agent_info_buffs[task_id]['mean'][inds],
+                                                   log_std     = self.agent_info_buffs[task_id]['log_std'][inds]),
+
+                        returns            = self.return_buffs[task_id][inds]
                     ))
         return paths
 
@@ -250,16 +268,18 @@ class MetaSampler_off(Sampler):
                         env_infos=utils.stack_tensor_dict_list(running_paths[idx]["env_infos"]),
                         agent_infos=utils.stack_tensor_dict_list(running_paths[idx]["agent_infos"]),
                     ))
+
                     discount_reward = utils.discount_cumsum(np.asarray(running_paths[idx]["rewards"]), self.discount)
 
                     self.buffer.push(idx // self.envs_per_task, 
                                     np.asarray(running_paths[idx]["observations"]), 
                                     np.asarray(running_paths[idx]["actions"]),
-                                    discount_reward,
+                                    np.asarray(running_paths[idx]["rewards"]),
                                     np.asarray(running_paths[idx]["next_observations"]),
                                     np.asarray(running_paths[idx]["dones"]),
                                     utils.stack_tensor_dict_list(running_paths[idx]["env_infos"]),
-                                    utils.stack_tensor_dict_list(running_paths[idx]["agent_infos"])
+                                    utils.stack_tensor_dict_list(running_paths[idx]["agent_infos"]),
+                                    discount_reward
                                     )
 
                     new_samples += len(running_paths[idx]["rewards"])

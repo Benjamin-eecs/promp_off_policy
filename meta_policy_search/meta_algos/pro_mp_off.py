@@ -64,6 +64,21 @@ class ProMP_off(MAMLAlgo):
             surr_obj_adapt = -tf.reduce_mean(likelihood_ratio_adapt * adv_sym)
         return surr_obj_adapt
 
+
+    def _adapt_objective_sym_off(self, action_sym, adv_sym, dist_info_old_sym, dist_info_new_sym):
+        with tf.variable_scope("likelihood_ratio"):
+            likelihood_ratio_adapt = self.policy.distribution.likelihood_ratio_sym(action_sym,
+                                                                                   dist_info_old_sym, dist_info_new_sym)
+        with tf.variable_scope("surrogate_loss"):
+            clip_obj_adapt = tf.minimum(likelihood_ratio_adapt *adv_sym,
+                                         tf.clip_by_value(likelihood_ratio_adapt,
+                                                          1 - 0.3,
+                                                          1 + 0.3) * adv_sym)
+            surr_obj_adapt = -tf.reduce_mean(clip_obj_adapt)
+        return surr_obj_adapt
+
+
+
     def build_graph(self):
         """
         Creates the computation graph
@@ -75,19 +90,28 @@ class ProMP_off(MAMLAlgo):
 
             """ --- Build inner update graph for adapting the policy and sampling trajectories --- """
             # this graph is only used for adapting the policy and not computing the meta-updates
-            self.adapted_policies_params, self.adapt_input_ph_dict = self._build_inner_adaption()
+            self.adapted_policies_params, self.adapt_input_ph_dict = self._build_inner_adaption_off()
 
             """ ----- Build graph for the meta-update ----- """
             self.meta_op_phs_dict = OrderedDict()
-            obs_phs, action_phs, adv_phs, dist_info_old_phs, all_phs_dict = self._make_input_placeholders('step0')
-            self.meta_op_phs_dict.update(all_phs_dict)
+            obs_phs, action_phs, adv_phs, dist_info_old_phs, all_phs_dict                     = self._make_input_placeholders('step0')
 
-            distribution_info_vars, current_policy_params = [], []
+            obs_phs_off, action_phs_off, adv_phs_off, dist_info_old_phs_off, all_phs_dict_off = self._make_input_placeholders('step2')
+
+            self.meta_op_phs_dict.update(all_phs_dict)
+            self.meta_op_phs_dict.update(all_phs_dict_off)
+            
+            
+            distribution_info_vars, distribution_info_vars_off, current_policy_params = [], [], []
             all_surr_objs, all_inner_kls = [], []
 
         for i in range(self.meta_batch_size):
-            dist_info_sym = self.policy.distribution_info_sym(obs_phs[i], params=None)
+            dist_info_sym      = self.policy.distribution_info_sym(obs_phs[i], params=None)
             distribution_info_vars.append(dist_info_sym)  # step 0
+
+            dist_info_sym_off  = self.policy.distribution_info_sym(obs_phs_off[i], params=None)
+            distribution_info_vars_off.append(dist_info_sym_off)  # step 0
+
             current_policy_params.append(self.policy.policy_params) # set to real policy_params (tf.Variable)
 
         with tf.variable_scope(self.name):
@@ -97,9 +121,13 @@ class ProMP_off(MAMLAlgo):
 
                 # inner adaptation step for each task
                 for i in range(self.meta_batch_size):
-                    surr_loss = self._adapt_objective_sym(action_phs[i], adv_phs[i], dist_info_old_phs[i], distribution_info_vars[i])
+                    surr_loss          = self._adapt_objective_sym(action_phs[i], adv_phs[i], dist_info_old_phs[i], distribution_info_vars[i])
+
+                    surr_loss_off      = self._adapt_objective_sym_off(action_phs_off[i], adv_phs_off[i], dist_info_old_phs_off[i], distribution_info_vars_off[i])
+
                     kl_loss = tf.reduce_mean(self.policy.distribution.kl_sym(dist_info_old_phs[i], distribution_info_vars[i]))
 
+                    surr_loss_all      = 0.5*surr_loss+0.5*surr_loss_off
                     adapted_params_var = self._adapt_sym(surr_loss, current_policy_params[i])
 
                     adapted_policy_params.append(adapted_params_var)

@@ -32,6 +32,22 @@ class LinearBaseline(Baseline):
             return np.zeros(len(path["observations"]))
         return self._features(path).dot(self._coeffs)
 
+
+
+    def predict_off_ob(self, path):
+
+        if self._coeffs is None:
+            return np.zeros(len(path["observations"]))
+        return self._features_ob(path).dot(self._coeffs)
+
+    def predict_off_next_ob(self, path):
+
+        if self._coeffs is None:
+            return np.zeros(len(path["next_observations"]))
+        return self._features_next_ob(path).dot(self._coeffs)
+
+
+
     def get_param_values(self, **tags):
         """
         Returns the parameter values of the baseline object
@@ -101,6 +117,22 @@ class LinearFeatureBaseline(LinearBaseline):
     def _features(self, path):
         obs = np.clip(path["observations"], -10, 10)
         path_length = len(path["observations"])
+        time_step = np.arange(path_length).reshape(-1, 1) / 100.0
+        return np.concatenate([obs, obs ** 2, time_step, time_step ** 2, time_step ** 3, np.ones((path_length, 1))],
+                              axis=1)
+
+
+
+    def _features_ob(self, path):
+        obs = np.clip(path["observations"], -10, 10)
+        path_length = len(path["observations"])
+        time_step = np.arange(path_length).reshape(-1, 1) / 100.0
+        return np.concatenate([obs, obs ** 2, time_step, time_step ** 2, time_step ** 3, np.ones((path_length, 1))],
+                              axis=1)
+        
+    def _features_next_ob(self, path):
+        obs = np.clip(path["next_observations"], -10, 10)
+        path_length = len(path["next_observations"])
         time_step = np.arange(path_length).reshape(-1, 1) / 100.0
         return np.concatenate([obs, obs ** 2, time_step, time_step ** 2, time_step ** 3, np.ones((path_length, 1))],
                               axis=1)

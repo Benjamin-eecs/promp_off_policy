@@ -117,13 +117,13 @@ class Trainer_off(object):
                         logger.log("Computing inner policy updates...")
                         off_sample_path  = self.sampler.buffer.sample(self.sample_batch_size)
                         off_sample_data  = self.sample_processor.process_samples_off(off_sample_path)
-                        print(off_sample_data)
-                        time.sleep(100)
-                        #self.algo._adapt(samples_data)
-                        self.algo._adapt_off(off_sample_data)
-                    # train_writer = tf.summary.FileWriter('/home/ignasi/Desktop/meta_policy_search_graph',
-                    #                                      sess.graph)
+                        
+                        self.algo._adapt_off(samples_data, off_sample_data)
+
                     list_inner_step_time.append(time.time() - time_inner_step_start)
+
+                all_samples_data.append(off_sample_data)
+
                 total_inner_time = time.time() - start_total_inner_time
 
                 time_maml_opt_start = time.time()
