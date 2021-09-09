@@ -22,11 +22,12 @@ utils.stack_tensor_dict_list(running_paths[idx]["env_infos"]),
 utils.stack_tensor_dict_list(running_paths[idx]["agent_infos"])
 '''
 class ReplayBuffer(object):
-    def __init__(self, buffer_length, num_tasks, ob_dim, ac_dim):
+    def __init__(self, buffer_length, num_tasks, ob_dim, ac_dim, traj_length):
         self.buffer_length  = int(buffer_length)
         self.num_tasks      = num_tasks
 
-
+        self.traj_len       = traj_length
+        
         self.ob_buffs          = OrderedDict()
         self.ac_buffs          = OrderedDict()
         self.rew_buffs         = OrderedDict()
@@ -120,23 +121,27 @@ class ReplayBuffer(object):
 
     def sample(self, N):
 
-        inds = np.random.choice(np.arange(min(self.filled_i)), size=N, replace=True)
-        inds = np.arange(min(self.filled_i))
+        inds = np.random.choice(np.arange((min(self.filled_i) // self.traj_len)-1), size=N, replace=True)
+        
+
         paths = OrderedDict()
         for task_id in range(self.num_tasks):
             paths[task_id] = []
-            paths[task_id].append(dict(
-                        observations       = self.ob_buffs[task_id][inds],
-                        actions            = self.ac_buffs[task_id][inds],
-                        rewards            = self.rew_buffs[task_id][inds],
-                        next_observations  = self.next_ob_buffs[task_id][inds],
-                        env_infos          = dict(reward_run  = self.env_info_buffs[task_id]['reward_run'][inds],
-                                                  reward_ctrl = self.env_info_buffs[task_id]['reward_ctrl'][inds]),
-                        agent_infos        = dict(mean        = self.agent_info_buffs[task_id]['mean'][inds],
-                                                   log_std     = self.agent_info_buffs[task_id]['log_std'][inds]),
-
-                        returns            = self.return_buffs[task_id][inds]
-                    ))
+            for traj_id in list(inds):
+                #print(self.done_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)][-1])
+                paths[task_id].append(dict(
+                            observations       = self.ob_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
+                            actions            = self.ac_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
+                            rewards            = self.rew_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
+                            next_observations  = self.next_ob_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
+                            env_infos          = dict(reward_run  = self.env_info_buffs[task_id]['reward_run'][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
+                                                      reward_ctrl = self.env_info_buffs[task_id]['reward_ctrl'][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)]),
+                            agent_infos        = dict(mean        = self.agent_info_buffs[task_id]['mean'][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
+                                                       log_std     = self.agent_info_buffs[task_id]['log_std'][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)]),
+  
+                            returns            = self.return_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)]
+                        ))
+        #time.sleep(1000)
         return paths
 
 
@@ -174,6 +179,8 @@ class MetaSampler_off(Sampler):
         self.parallel = parallel
         self.total_timesteps_sampled = 0
 
+
+        self.max_path_length  = max_path_length
         self.discount         = discount
 
         self.buffer_length    = buffer_length
@@ -182,7 +189,8 @@ class MetaSampler_off(Sampler):
 
         self.buffer           = ReplayBuffer(self.buffer_length, self.meta_batch_size,
                                   self.ob_dim,
-                                  self.ac_dim)
+                                  self.ac_dim,
+                                  self.max_path_length)
 
         # setup vectorized environment
 
