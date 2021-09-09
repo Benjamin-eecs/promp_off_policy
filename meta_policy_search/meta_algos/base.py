@@ -198,11 +198,12 @@ class MAMLAlgo(MetaAlgo):
 
             # get tf operation for adapted (post-update) policy
             with tf.variable_scope("adapt_step"):
-                all_surr_obj_adapt = 0.5 * surr_obj_adapt + 0.5 * surr_obj_adapt_off
-                adapted_policy_param = self._adapt_sym(surr_obj_adapt, self.policy.policies_params_phs[i])
+                all_surr_obj_adapt = 0.8 * surr_obj_adapt + 0.2 * surr_obj_adapt_off
+                adapted_policy_param = self._adapt_sym(all_surr_obj_adapt, self.policy.policies_params_phs[i])
+
             adapted_policies_params.append(adapted_policy_param)
 
-        return adapted_policies_params, adapt_input_ph_dict
+        return adapted_policies_params, adapt_input_ph_dict, adapt_input_ph_dict_off
 
 
 
@@ -317,18 +318,21 @@ class MAMLAlgo(MetaAlgo):
         input_dict_on            = self._extract_input_dict(on_samples,  self._optimization_keys, prefix='adapt')
         input_dict_off           = self._extract_input_dict(off_samples, self._optimization_keys, prefix='adapt1')
 
-        input_dict_all       ={**input_dict_on, **input_dict_off}
 
-        input_ph_dict        = self.adapt_input_ph_dict
+        input_ph_dict_on         = self.adapt_input_ph_dict
+        input_ph_dict_off        = self.adapt_input_ph_dict_off
 
-        print(input_dict_all)
-        print(self.adapt_input_ph_dict)
-        feed_dict_inputs     = utils.create_feed_dict(placeholder_dict=input_ph_dict, value_dict=input_dict_all)
-        feed_dict_params     = self.policy.policies_params_feed_dict
+
+        feed_dict_inputs_on      = utils.create_feed_dict(placeholder_dict=input_ph_dict_on, value_dict=input_dict_on)
+        feed_dict_inputs_off     = utils.create_feed_dict(placeholder_dict=input_ph_dict_off, value_dict=input_dict_off)
+
+        feed_dict_inputs_all     = {**feed_dict_inputs_on, **feed_dict_inputs_off}
+        
+        feed_dict_params         = self.policy.policies_params_feed_dict
 
 
  
-        feed_dict = {**feed_dict_inputs, **feed_dict_params}  # merge the two feed dicts
+        feed_dict = {**feed_dict_inputs_all, **feed_dict_params}  # merge the two feed dicts
 
         
         # compute the post-update / adapted policy parameters

@@ -39,12 +39,17 @@ class ProMP_off(MAMLAlgo):
             init_inner_kl_penalty=1e-2,
             adaptive_inner_kl_penalty=True,
             anneal_factor=1.0,
+            off_clip_eps = 0.3,
             **kwargs
             ):
         super(ProMP_off, self).__init__(*args, **kwargs)
 
         self.optimizer = MAMLPPOOptimizer(learning_rate=learning_rate, max_epochs=num_ppo_steps, num_minibatches=num_minibatches)
         self.clip_eps = clip_eps
+
+        self.off_clip_eps = off_clip_eps
+
+
         self.target_inner_step = target_inner_step
         self.adaptive_inner_kl_penalty = adaptive_inner_kl_penalty
         self.inner_kl_coeff = init_inner_kl_penalty * np.ones(self.num_inner_grad_steps)
@@ -72,8 +77,8 @@ class ProMP_off(MAMLAlgo):
         with tf.variable_scope("surrogate_loss"):
             clip_obj_adapt = tf.minimum(likelihood_ratio_adapt *adv_sym,
                                          tf.clip_by_value(likelihood_ratio_adapt,
-                                                          1 - 0.3,
-                                                          1 + 0.3) * adv_sym)
+                                                          1 - self.off_clip_eps,
+                                                          1 + self.off_clip_eps) * adv_sym)
             surr_obj_adapt = -tf.reduce_mean(clip_obj_adapt)
         return surr_obj_adapt
 
@@ -90,7 +95,7 @@ class ProMP_off(MAMLAlgo):
 
             """ --- Build inner update graph for adapting the policy and sampling trajectories --- """
             # this graph is only used for adapting the policy and not computing the meta-updates
-            self.adapted_policies_params, self.adapt_input_ph_dict = self._build_inner_adaption_off()
+            self.adapted_policies_params, self.adapt_input_ph_dict, self.adapt_input_ph_dict_off = self._build_inner_adaption_off()
 
             """ ----- Build graph for the meta-update ----- """
             self.meta_op_phs_dict = OrderedDict()
@@ -107,10 +112,10 @@ class ProMP_off(MAMLAlgo):
 
         for i in range(self.meta_batch_size):
             dist_info_sym      = self.policy.distribution_info_sym(obs_phs[i], params=None)
-            distribution_info_vars.append(dist_info_sym)  # step 0
+            distribution_info_vars.append(dist_info_sym)          # step 0
 
             dist_info_sym_off  = self.policy.distribution_info_sym(obs_phs_off[i], params=None)
-            distribution_info_vars_off.append(dist_info_sym_off)  # step 0
+            distribution_info_vars_off.append(dist_info_sym_off)  # step 2
 
             current_policy_params.append(self.policy.policy_params) # set to real policy_params (tf.Variable)
 
@@ -127,8 +132,8 @@ class ProMP_off(MAMLAlgo):
 
                     kl_loss = tf.reduce_mean(self.policy.distribution.kl_sym(dist_info_old_phs[i], distribution_info_vars[i]))
 
-                    surr_loss_all      = 0.5*surr_loss+0.5*surr_loss_off
-                    adapted_params_var = self._adapt_sym(surr_loss, current_policy_params[i])
+                    surr_loss_all      = 0.8*surr_loss+0.2*surr_loss_off
+                    adapted_params_var = self._adapt_sym(surr_loss_all, current_policy_params[i])
 
                     adapted_policy_params.append(adapted_params_var)
                     kls.append(kl_loss)

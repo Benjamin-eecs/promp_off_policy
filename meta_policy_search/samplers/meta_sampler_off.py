@@ -55,16 +55,16 @@ class ReplayBuffer(object):
             self.agent_info_buffs[i]        = dict(mean      =np.zeros((self.buffer_length, ac_dim), dtype=np.float32),log_std=np.zeros((self.buffer_length, ac_dim), dtype=np.float32))
 
 
-        self.filled_i = 0  # index of first empty location in buffer (last index when full)
-        self.curr_i  = 0    # current index to write to (ovewrite oldest data)
+        self.filled_i = [0]* self.num_tasks # index of first empty location in buffer (last index when full)
+        self.curr_i   = [0]* self.num_tasks    # current index to write to (ovewrite oldest data)
 
 
     def push(self, task_id, observations, actions, rewards, next_observations, dones, env_infos, agent_infos, returns):
         nentries = observations.shape[0]  # handle multiple parallel environments
 
 
-        if self.curr_i + nentries > self.buffer_length:
-            rollover = self.buffer_length - self.curr_i # num of indices to roll over
+        if self.curr_i[task_id] + nentries > self.buffer_length:
+            rollover = self.buffer_length - self.curr_i[task_id] # num of indices to roll over
 
             self.ob_buffs[task_id]       = np.roll(self.ob_buffs[task_id],
                                                         rollover, axis=0)
@@ -91,34 +91,37 @@ class ReplayBuffer(object):
 
 
 
-            self.curr_i = 0
-            self.filled_i = self.buffer_length
+            self.curr_i[task_ida] = 0
+            self.filled_i[task_id] = self.buffer_length
 
-        self.ob_buffs[task_id][self.curr_i:self.curr_i + nentries]        = observations
-        self.ac_buffs[task_id][self.curr_i:self.curr_i + nentries]        = actions
-        self.rew_buffs[task_id][self.curr_i:self.curr_i + nentries]       = rewards
-        self.next_ob_buffs[task_id][self.curr_i:self.curr_i + nentries]   = next_observations
-        self.done_buffs[task_id][self.curr_i:self.curr_i + nentries]      = dones
+        self.ob_buffs[task_id][self.curr_i[task_id]:self.curr_i[task_id] + nentries]        = observations
+        self.ac_buffs[task_id][self.curr_i[task_id]:self.curr_i[task_id] + nentries]        = actions
+        self.rew_buffs[task_id][self.curr_i[task_id]:self.curr_i[task_id] + nentries]       = rewards
+        self.next_ob_buffs[task_id][self.curr_i[task_id]:self.curr_i[task_id] + nentries]   = next_observations
+        self.done_buffs[task_id][self.curr_i[task_id]:self.curr_i[task_id] + nentries]      = dones
 
-        self.return_buffs[task_id][self.curr_i:self.curr_i + nentries]    = returns
+        self.return_buffs[task_id][self.curr_i[task_id]:self.curr_i[task_id] + nentries]    = returns
   
 
-        self.env_info_buffs[task_id]['reward_run'][self.curr_i:self.curr_i + nentries]      = env_infos['reward_run']
-        self.env_info_buffs[task_id]['reward_ctrl'][self.curr_i:self.curr_i + nentries]     = env_infos['reward_ctrl']
-        self.agent_info_buffs[task_id]['mean'][self.curr_i:self.curr_i + nentries]          = agent_infos['mean']
-        self.agent_info_buffs[task_id]['log_std'][self.curr_i:self.curr_i + nentries]       = agent_infos['log_std']
+        self.env_info_buffs[task_id]['reward_run'][self.curr_i[task_id]:self.curr_i[task_id] + nentries]      = env_infos['reward_run']
+        self.env_info_buffs[task_id]['reward_ctrl'][self.curr_i[task_id]:self.curr_i[task_id] + nentries]     = env_infos['reward_ctrl']
+        self.agent_info_buffs[task_id]['mean'][self.curr_i[task_id]:self.curr_i[task_id] + nentries]          = agent_infos['mean']
+        self.agent_info_buffs[task_id]['log_std'][self.curr_i[task_id]:self.curr_i[task_id] + nentries]       = agent_infos['log_std']
 
-        self.curr_i += nentries
-        if self.filled_i < self.buffer_length:
-            self.filled_i += nentries
-        if self.curr_i == self.buffer_length:
-            self.curr_i = 0
+        self.curr_i[task_id] += nentries
+        if self.filled_i[task_id] < self.buffer_length:
+            self.filled_i[task_id] += nentries
+        if self.curr_i[task_id] == self.buffer_length:
+            self.curr_i[task_id] = 0
+
+
 
 
 
     def sample(self, N):
 
-        inds = np.random.choice(np.arange(self.filled_i), size=N, replace=True)
+        inds = np.random.choice(np.arange(min(self.filled_i)), size=N, replace=True)
+        inds = np.arange(min(self.filled_i))
         paths = OrderedDict()
         for task_id in range(self.num_tasks):
             paths[task_id] = []
@@ -271,6 +274,7 @@ class MetaSampler_off(Sampler):
 
                     discount_reward = utils.discount_cumsum(np.asarray(running_paths[idx]["rewards"]), self.discount)
 
+                    
                     self.buffer.push(idx // self.envs_per_task, 
                                     np.asarray(running_paths[idx]["observations"]), 
                                     np.asarray(running_paths[idx]["actions"]),
@@ -281,10 +285,10 @@ class MetaSampler_off(Sampler):
                                     utils.stack_tensor_dict_list(running_paths[idx]["agent_infos"]),
                                     discount_reward
                                     )
-
+                
                     new_samples += len(running_paths[idx]["rewards"])
                     running_paths[idx] = _get_empty_running_paths_dict()
-
+                
             pbar.update(new_samples)
             n_samples += new_samples
             obses = next_obses

@@ -116,6 +116,7 @@ class Trainer_off(object):
                     if step < self.num_inner_grad_steps:
                         logger.log("Computing inner policy updates...")
                         off_sample_path  = self.sampler.buffer.sample(self.sample_batch_size)
+                        #print(off_sample_path)
                         off_sample_data  = self.sample_processor.process_samples_off(off_sample_path)
                         
                         self.algo._adapt_off(samples_data, off_sample_data)

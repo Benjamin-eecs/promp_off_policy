@@ -60,16 +60,17 @@ def main(config):
     )
 
     algo = ProMP_off(
-        policy=policy,
-        inner_lr=config['inner_lr'],
-        meta_batch_size=config['meta_batch_size'],
-        num_inner_grad_steps=config['num_inner_grad_steps'],
-        learning_rate=config['learning_rate'],
-        num_ppo_steps=config['num_promp_steps'],
-        clip_eps=config['clip_eps'],
-        target_inner_step=config['target_inner_step'],
-        init_inner_kl_penalty=config['init_inner_kl_penalty'],
-        adaptive_inner_kl_penalty=config['adaptive_inner_kl_penalty'],
+        policy                     =policy,
+        inner_lr                   =config['inner_lr'],
+        meta_batch_size            =config['meta_batch_size'],
+        num_inner_grad_steps       =config['num_inner_grad_steps'],
+        learning_rate              =config['learning_rate'],
+        num_ppo_steps              =config['num_promp_steps'],
+        clip_eps                   =config['clip_eps'],
+        target_inner_step          =config['target_inner_step'],
+        init_inner_kl_penalty      =config['init_inner_kl_penalty'],
+        adaptive_inner_kl_penalty  =config['adaptive_inner_kl_penalty'],
+        off_clip_eps               =config['off_clip_eps']
     )
 
     trainer = Trainer_off(
@@ -94,12 +95,15 @@ if __name__=="__main__":
     parser.add_argument('--lr',   type=int, default=1e-4, help='learning rate')
     parser.add_argument('--env',  type=str, default='HalfCheetahRandDirecEnv', help='environment')
 
+    parser.add_argument('--meta_batch_size',   type=int, default=4, help='meta batch size')
+
+    parser.add_argument('--rollout_per_task',  type=int, default=20, help='rollout per task')
 
     parser.add_argument('--config_file', type=str, default='', help='json file with run specifications')
     parser.add_argument('--dump_path', type=str, default=meta_policy_search_path + '/data/pro-mp/run_%d' % idx)
 
     args = parser.parse_args()
-
+    args.dump_path = '/home/liubo/promp_all/ProMP' + '/data/pro-mp/test_seed_%d' % args.seed
 
     if args.config_file: # load configuration from json file
         with open(args.config_file, 'r') as f:
@@ -108,44 +112,44 @@ if __name__=="__main__":
     else: # use default config
 
         config = {
-            'seed': args.seed,
-
+            'seed'    : args.seed,
+            'sampler' : 1,
             #off_policy config
 
-            'buffer_length'     : 10,
-            'sample_batch_size' : 3,
+            'buffer_length'                       : 10000,
+            'sample_batch_size'                   : 2000,
+            'off_clip_eps'                        : 0.3,
 
 
+            'baseline'                            : 'LinearFeatureBaseline',
 
-            'baseline': 'LinearFeatureBaseline',
-
-            'env': args.env,
+            'env'                                 : args.env,
 
             # sampler config
-            'rollouts_per_meta_task': 2,
-            'max_path_length': 5,
-            'parallel': True,
+            'rollouts_per_meta_task'              : args.rollout_per_task,
+            'max_path_length'                     : 100,
+            'parallel'                            : True,
 
             # sample processor config
-            'discount': 0.99,
-            'gae_lambda': 1,
-            'normalize_adv': True,
+            'discount'                            : 0.99,
+            'gae_lambda'                          : 1,
+            'normalize_adv'                       : True,
 
             # policy config
-            'hidden_sizes': (64, 64),
-            'learn_std': True, # whether to learn the standard deviation of the gaussian policy
+            'hidden_sizes'                        : (64, 64),
+            'learn_std'                           : True, # whether to learn the standard deviation of the gaussian policy
 
             # ProMP config
-            'inner_lr': 0.1, # adaptation step size
-            'learning_rate': args.lr, # meta-policy gradient step size
-            'num_promp_steps': 5, # number of ProMp steps without re-sampling
-            'clip_eps': 0.3, # clipping range
-            'target_inner_step': 0.01,
-            'init_inner_kl_penalty': 5e-4,
-            'adaptive_inner_kl_penalty': False, # whether to use an adaptive or fixed KL-penalty coefficient
-            'n_itr': 1001, # number of overall training iterations
-            'meta_batch_size': 2, # number of sampled meta-tasks per iterations
-            'num_inner_grad_steps': 1, # number of inner / adaptation gradient steps
+            'inner_lr'                            : 0.1, # adaptation step size
+            'learning_rate'                       : args.lr, # meta-policy gradient step size
+            'num_promp_steps'                     : 5, # number of ProMp steps without re-sampling
+            'clip_eps'                            : 0.3, # clipping range
+            'target_inner_step'                   : 0.01,
+            'init_inner_kl_penalty'               : 5e-4,
+            'adaptive_inner_kl_penalty'           : False, # whether to use an adaptive or fixed KL-penalty coefficient
+            'n_itr'                               : 1001, # number of overall training iterations
+            'meta_batch_size'                     : args.meta_batch_size, # number of sampled meta-tasks per iterations
+            'num_inner_grad_steps'                : 1, # number of inner / adaptation gradient steps
 
         }
 
