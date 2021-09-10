@@ -119,17 +119,17 @@ class ReplayBuffer(object):
 
 
 
-    def sample(self, N):
+    def sample(self, tasks_id, N):
 
         inds = np.random.choice(np.arange((min(self.filled_i) // self.traj_len)-1), size=N, replace=True)
         
 
         paths = OrderedDict()
-        for task_id in range(self.num_tasks):
-            paths[task_id] = []
+        for meta_id, task_id in enumerate(tasks_id):
+            paths[meta_id] = []
             for traj_id in list(inds):
                 #print(self.done_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)][-1])
-                paths[task_id].append(dict(
+                paths[meta_id].append(dict(
                             observations       = self.ob_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
                             actions            = self.ac_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
                             rewards            = self.rew_buffs[task_id][np.arange(traj_id*self.traj_len,traj_id*self.traj_len+self.traj_len)],
@@ -168,7 +168,8 @@ class MetaSampler_off(Sampler):
             envs_per_task=None,
             parallel=False,
             buffer_length = 1e4,
-            discount = 0.99
+            discount = 0.99,
+            num_tasks=2
             ):
         super(MetaSampler_off, self).__init__(env, policy, rollouts_per_meta_task, max_path_length)
         assert hasattr(env, 'set_task')
@@ -178,8 +179,8 @@ class MetaSampler_off(Sampler):
         self.total_samples   = meta_batch_size * rollouts_per_meta_task * max_path_length
         self.parallel = parallel
         self.total_timesteps_sampled = 0
-
-
+        self.num_tasks       = num_tasks
+   
         self.max_path_length  = max_path_length
         self.discount         = discount
 
@@ -187,7 +188,7 @@ class MetaSampler_off(Sampler):
         self.ob_dim           = np.prod(env.observation_space.shape)
         self.ac_dim           = np.prod(env.action_space.shape)
 
-        self.buffer           = ReplayBuffer(self.buffer_length, self.meta_batch_size,
+        self.buffer           = ReplayBuffer(self.buffer_length, self.num_tasks,
                                   self.ob_dim,
                                   self.ac_dim,
                                   self.max_path_length)
@@ -208,7 +209,17 @@ class MetaSampler_off(Sampler):
         assert len(tasks) == self.meta_batch_size
         self.vec_env.set_tasks(tasks)
 
-    def obtain_samples(self, log=False, log_prefix=''):
+
+    def update_tasks_with_id(self):
+         """
+         Samples a new goal for each meta task
+         """
+         tasks, tasks_id = self.env.sample_tasks_with_id(self.meta_batch_size, return_id=True)
+         assert len(tasks) == self.meta_batch_size
+         self.vec_env.set_tasks(tasks)
+         return tasks, tasks_id
+
+    def obtain_samples(self, tasks_id, log=False, log_prefix=''):
         """
         Collect batch_size trajectories from each task
 
@@ -249,6 +260,7 @@ class MetaSampler_off(Sampler):
             actions = np.concatenate(actions) # stack meta batch
             next_obses, rewards, dones, env_infos = self.vec_env.step(actions)
             env_time += time.time() - t
+            
 
             #  stack agent_infos and if no infos were provided (--> None) create empty dicts
             agent_infos, env_infos = self._handle_info_dicts(agent_infos, env_infos)
@@ -283,7 +295,7 @@ class MetaSampler_off(Sampler):
                     discount_reward = utils.discount_cumsum(np.asarray(running_paths[idx]["rewards"]), self.discount)
 
                     
-                    self.buffer.push(idx // self.envs_per_task, 
+                    self.buffer.push(tasks_id[idx // self.envs_per_task], 
                                     np.asarray(running_paths[idx]["observations"]), 
                                     np.asarray(running_paths[idx]["actions"]),
                                     np.asarray(running_paths[idx]["rewards"]),

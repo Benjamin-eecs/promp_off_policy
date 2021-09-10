@@ -83,7 +83,9 @@ class Trainer_off(object):
                 logger.log("\n ---------------- Iteration %d ----------------" % itr)
                 logger.log("Sampling set of tasks/goals for this meta-batch...")
 
-                self.sampler.update_tasks()
+                #self.sampler.update_tasks()
+                tasks, tasks_id = self.sampler.update_tasks_with_id()
+                
                 self.policy.switch_to_pre_update()  # Switch to pre-update policy
 
                 all_samples_data, all_paths = [], []
@@ -96,7 +98,7 @@ class Trainer_off(object):
 
                     logger.log("Obtaining samples...")
                     time_env_sampling_start = time.time()
-                    paths = self.sampler.obtain_samples(log=True, log_prefix='Step_%d-' % step)
+                    paths = self.sampler.obtain_samples(tasks_id, log=True, log_prefix='Step_%d-' % step)
                     list_sampling_time.append(time.time() - time_env_sampling_start)
                     all_paths.append(paths)
 
@@ -115,7 +117,7 @@ class Trainer_off(object):
                     time_inner_step_start = time.time()
                     if step < self.num_inner_grad_steps:
                         logger.log("Computing inner policy updates...")
-                        off_sample_path  = self.sampler.buffer.sample(self.sample_batch_size)
+                        off_sample_path  = self.sampler.buffer.sample(tasks_id, self.sample_batch_size)
                         #print(off_sample_path)
                         off_sample_data  = self.sample_processor.process_samples_off(off_sample_path)
                         

@@ -49,7 +49,8 @@ def main(config):
         max_path_length=config['max_path_length'],
         parallel=config['parallel'],
         buffer_length = config['buffer_length'],
-        discount=config['discount']
+        discount=config['discount'],
+        num_tasks = config['num_tasks']
     )
 
     sample_processor = MetaSampleProcessor_off(
@@ -97,7 +98,7 @@ if __name__=="__main__":
 
     parser.add_argument('--meta_batch_size',   type=int, default=4, help='meta batch size')
 
-    parser.add_argument('--rollout_per_task',  type=int, default=20, help='rollout per task')
+    parser.add_argument('--rollout_per_task',  type=int, default=5, help='rollout per task')
 
     parser.add_argument('--config_file', type=str, default='', help='json file with run specifications')
     parser.add_argument('--dump_path', type=str, default=meta_policy_search_path + '/data/pro-mp/run_%d' % idx)
@@ -116,8 +117,10 @@ if __name__=="__main__":
             'sampler' : 1,
             #off_policy config
 
+            'num_tasks'                           : 2,
+
             'buffer_length'                       : 10000,
-            'sample_batch_size'                   : 20,
+            'sample_batch_size'                   : 5,
             'off_clip_eps'                        : 0.3,
 
 

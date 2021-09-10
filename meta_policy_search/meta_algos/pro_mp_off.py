@@ -132,7 +132,7 @@ class ProMP_off(MAMLAlgo):
 
                     kl_loss = tf.reduce_mean(self.policy.distribution.kl_sym(dist_info_old_phs[i], distribution_info_vars[i]))
 
-                    surr_loss_all      = surr_loss+surr_loss_off
+                    surr_loss_all      = 0.8*surr_loss + 0.2*surr_loss_off
                     adapted_params_var = self._adapt_sym(surr_loss_all, current_policy_params[i])
 
                     adapted_policy_params.append(adapted_params_var)

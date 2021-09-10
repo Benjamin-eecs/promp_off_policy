@@ -143,6 +143,20 @@ class MetaParallelEnvExecutor(object):
 
         return obs, rewards, dones, env_infos
 
+
+    def get_task(self):
+        """
+        Resets the environments of each worker
+
+        Returns:
+             (list): list of (np.ndarray) with task_id.
+        """
+
+        for remote in self.remotes:
+            remote.send(('get_task', None))
+        return sum([remote.recv() for remote in self.remotes], [])
+
+
     def reset(self):
         """
         Resets the environments of each worker
@@ -165,6 +179,11 @@ class MetaParallelEnvExecutor(object):
             remote.send(('set_task', task))
         for remote in self.remotes:
             remote.recv()
+
+    def get_tasks(self):
+        for remote in self.remotes:
+            remote.send(('get_task', None))
+        return [remote.recv() for remote in self.remotes]
 
     @property
     def num_envs(self):
@@ -229,6 +248,11 @@ def worker(remote, parent_remote, env_pickle, n_envs, max_path_length, seed):
         elif cmd == 'close':
             remote.close()
             break
+
+        elif cmd == 'get_task':
+            tasks = [env.get_task() for env in envs]
+            remote.send(tasks)
+
 
         else:
             raise NotImplementedError
