@@ -198,7 +198,7 @@ class MAMLAlgo(MetaAlgo):
 
             # get tf operation for adapted (post-update) policy
             with tf.variable_scope("adapt_step"):
-                all_surr_obj_adapt = surr_obj_adapt + surr_obj_adapt_off
+                all_surr_obj_adapt   = 0.5 * surr_obj_adapt + 0.5 * surr_obj_adapt_off
                 adapted_policy_param = self._adapt_sym(all_surr_obj_adapt, self.policy.policies_params_phs[i])
 
             adapted_policies_params.append(adapted_policy_param)

@@ -24,6 +24,7 @@ import time
 
 meta_policy_search_path = '/'.join(os.path.realpath(os.path.dirname(__file__)).split('/')[:-1])
 
+
 def main(config):
     set_seed(config['seed'])
 
@@ -92,6 +93,8 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser(description='ProMP: Proximal Meta-Policy Search')
 
+    parser.add_argument('--sampler', type=int, default=1, help='parameter setting')
+
     parser.add_argument('--seed', type=int, default=0, help='random seed')
     parser.add_argument('--lr',   type=int, default=1e-4, help='learning rate')
     parser.add_argument('--env',  type=str, default='HalfCheetahRandDirecEnv', help='environment')
@@ -104,7 +107,7 @@ if __name__=="__main__":
     parser.add_argument('--dump_path', type=str, default=meta_policy_search_path + '/data/pro-mp/run_%d' % idx)
 
     args = parser.parse_args()
-    args.dump_path = '/home/liubo/promp_all/ProMP' + '/data/pro-mp/test_seed_%d' % args.seed
+    args.dump_path = '/home/liubo/promp_liubo/ProMP' + '/data/pro-mp/test_params_%d_seed_%d' % (args.sampler, args.seed)
 
     if args.config_file: # load configuration from json file
         with open(args.config_file, 'r') as f:
@@ -114,13 +117,14 @@ if __name__=="__main__":
 
         config = {
             'seed'    : args.seed,
-            'sampler' : 1,
+
+            'sampler' : args.sampler,
             #off_policy config
 
             'num_tasks'                           : 2,
 
-            'buffer_length'                       : 4000,
-            'sample_batch_size'                   : 20,
+            'buffer_length'                       : 4000, # meta_batch_size * rollout_per_task * max_path_length *constant
+            'sample_batch_size'                   : 5,    # for each meta task
             'off_clip_eps'                        : 0.3,
 
 
