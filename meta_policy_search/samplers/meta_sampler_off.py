@@ -177,7 +177,7 @@ class MetaSampler_off(Sampler):
         self.envs_per_task   = rollouts_per_meta_task if envs_per_task is None else envs_per_task
         self.meta_batch_size = meta_batch_size
         self.total_samples   = meta_batch_size * rollouts_per_meta_task * max_path_length
-        self.parallel = parallel
+        self.parallel        = parallel
         self.total_timesteps_sampled = 0
         self.num_tasks       = num_tasks
    
@@ -219,7 +219,7 @@ class MetaSampler_off(Sampler):
          self.vec_env.set_tasks(tasks)
          return tasks, tasks_id
 
-    def obtain_samples(self, tasks_id, log=False, log_prefix=''):
+    def obtain_samples(self, tasks_id, step_id, log=False, log_prefix=''):
         """
         Collect batch_size trajectories from each task
 
@@ -294,17 +294,17 @@ class MetaSampler_off(Sampler):
 
                     discount_reward = utils.discount_cumsum(np.asarray(running_paths[idx]["rewards"]), self.discount)
 
-                    
-                    self.buffer.push(tasks_id[idx // self.envs_per_task], 
-                                    np.asarray(running_paths[idx]["observations"]), 
-                                    np.asarray(running_paths[idx]["actions"]),
-                                    np.asarray(running_paths[idx]["rewards"]),
-                                    np.asarray(running_paths[idx]["next_observations"]),
-                                    np.asarray(running_paths[idx]["dones"]),
-                                    utils.stack_tensor_dict_list(running_paths[idx]["env_infos"]),
-                                    utils.stack_tensor_dict_list(running_paths[idx]["agent_infos"]),
-                                    discount_reward
-                                    )
+                    if step_id == 0:
+                        self.buffer.push(tasks_id[idx // self.envs_per_task], 
+                                         np.asarray(running_paths[idx]["observations"]), 
+                                         np.asarray(running_paths[idx]["actions"]),
+                                         np.asarray(running_paths[idx]["rewards"]),
+                                         np.asarray(running_paths[idx]["next_observations"]),
+                                         np.asarray(running_paths[idx]["dones"]),
+                                         utils.stack_tensor_dict_list(running_paths[idx]["env_infos"]),
+                                         utils.stack_tensor_dict_list(running_paths[idx]["agent_infos"]),
+                                         discount_reward
+                                        )
                 
                     new_samples += len(running_paths[idx]["rewards"])
                     running_paths[idx] = _get_empty_running_paths_dict()

@@ -119,8 +119,8 @@ if __name__=="__main__":
 
             'num_tasks'                           : 2,
 
-            'buffer_length'                       : 10000,
-            'sample_batch_size'                   : 5,
+            'buffer_length'                       : 4000,
+            'sample_batch_size'                   : 20,
             'off_clip_eps'                        : 0.3,
 
 

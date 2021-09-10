@@ -98,7 +98,7 @@ class Trainer_off(object):
 
                     logger.log("Obtaining samples...")
                     time_env_sampling_start = time.time()
-                    paths = self.sampler.obtain_samples(tasks_id, log=True, log_prefix='Step_%d-' % step)
+                    paths = self.sampler.obtain_samples(tasks_id, step_id=step, log=True, log_prefix='Step_%d-' % step)
                     list_sampling_time.append(time.time() - time_env_sampling_start)
                     all_paths.append(paths)
 
@@ -106,7 +106,11 @@ class Trainer_off(object):
 
                     logger.log("Processing samples...")
                     time_proc_samples_start = time.time()
-                    samples_data = self.sample_processor.process_samples(paths, log='all', log_prefix='Step_%d-' % step)
+                    if step   == 0:
+                        off_sample_path                   = self.sampler.buffer.sample(tasks_id, self.sample_batch_size)
+                        samples_data, off_sample_data     = self.sample_processor.process_samples(off_sample = off_sample_path, paths_meta_batch=paths, log='all', log_prefix='Step_%d-' % step)
+                    elif step == 1:
+                        samples_data,_                    = self.sample_processor.process_samples(off_sample = None, paths_meta_batch=paths, log='all', log_prefix='Step_%d-' % step)
                     all_samples_data.append(samples_data)
                     list_proc_samples_time.append(time.time() - time_proc_samples_start)
 
@@ -117,9 +121,6 @@ class Trainer_off(object):
                     time_inner_step_start = time.time()
                     if step < self.num_inner_grad_steps:
                         logger.log("Computing inner policy updates...")
-                        off_sample_path  = self.sampler.buffer.sample(tasks_id, self.sample_batch_size)
-                        #print(off_sample_path)
-                        off_sample_data  = self.sample_processor.process_samples_off(off_sample_path)
                         
                         self.algo._adapt_off(samples_data, off_sample_data)
 
