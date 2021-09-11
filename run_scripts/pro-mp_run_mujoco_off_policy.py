@@ -93,9 +93,12 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser(description='ProMP: Proximal Meta-Policy Search')
 
-    parser.add_argument('--sampler', type=int, default=1, help='parameter setting')
+
 
     parser.add_argument('--seed', type=int, default=0, help='random seed')
+    
+    parser.add_argument('--sampler', type=int, default=1, help='parameter setting')
+
     parser.add_argument('--lr',   type=int, default=1e-4, help='learning rate')
     parser.add_argument('--env',  type=str, default='HalfCheetahRandDirecEnv', help='environment')
 
@@ -124,8 +127,8 @@ if __name__=="__main__":
             'num_tasks'                           : 2,
 
             'buffer_length'                       : 4000, # meta_batch_size * rollout_per_task * max_path_length *constant
-            'sample_batch_size'                   : 5,    # for each meta task
-            'off_clip_eps'                        : 0.3,
+            'sample_batch_size'                   : 30,    # for each meta task
+            'off_clip_eps'                        : 0.6,
 
 
             'baseline'                            : 'LinearFeatureBaseline',
