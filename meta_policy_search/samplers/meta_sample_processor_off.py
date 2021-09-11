@@ -64,6 +64,43 @@ class MetaSampleProcessor_off(SampleProcessor):
         return samples_data_meta_batch, off_policy_samples_data_meta_batch
 
 
+
+    def test_process_samples_fit(self, paths_meta_batch, log=False, log_prefix=''):
+        assert isinstance(paths_meta_batch, dict), 'paths must be a dict'
+        assert self.baseline, 'baseline must be specified'
+        samples_data_meta_batch = []
+        all_paths = []
+        for meta_task, paths in paths_meta_batch.items():
+            samples_data, paths = self._compute_samples_data_fit(paths)
+            samples_data_meta_batch.append(samples_data)
+            all_paths.extend(paths)
+        overall_avg_reward = np.mean(np.concatenate([samples_data['rewards'] for samples_data in samples_data_meta_batch]))
+        overall_avg_reward_std = np.std(np.concatenate([samples_data['rewards'] for samples_data in samples_data_meta_batch]))
+        for samples_data in samples_data_meta_batch:
+            samples_data['adj_avg_rewards'] = (samples_data['rewards'] - overall_avg_reward) / (overall_avg_reward_std + 1e-8)
+        self._log_path_stats(all_paths, log=log, log_prefix=log_prefix)
+        return samples_data_meta_batch
+
+    def test_process_samples_no_fit(self, paths_meta_batch, log=False, log_prefix=''):
+        assert isinstance(paths_meta_batch, dict), 'paths must be a dict'
+        assert self.baseline, 'baseline must be specified'
+        samples_data_meta_batch = []
+        all_paths = []
+        for meta_task, paths in paths_meta_batch.items():
+            samples_data, paths = self._compute_samples_data_no_fit(paths)
+            samples_data_meta_batch.append(samples_data)
+            all_paths.extend(paths)
+        overall_avg_reward = np.mean(np.concatenate([samples_data['rewards'] for samples_data in samples_data_meta_batch]))
+        overall_avg_reward_std = np.std(np.concatenate([samples_data['rewards'] for samples_data in samples_data_meta_batch]))
+        for samples_data in samples_data_meta_batch:
+            samples_data['adj_avg_rewards'] = (samples_data['rewards'] - overall_avg_reward) / (overall_avg_reward_std + 1e-8)
+        self._log_path_stats(all_paths, log=log, log_prefix=log_prefix)
+        return samples_data_meta_batch
+
+
+
+
+
     def process_samples_off(self, paths_meta_batch, log=False, log_prefix=''):
         """
         Processes sampled paths. This involves:

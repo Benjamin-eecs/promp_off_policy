@@ -78,6 +78,8 @@ class Trainer_off(object):
             sess.run(tf.variables_initializer(uninit_vars))
 
             start_time = time.time()
+
+
             for itr in range(self.start_itr, self.n_itr):
                 itr_start_time = time.time()
                 logger.log("\n ---------------- Iteration %d ----------------" % itr)
@@ -98,9 +100,16 @@ class Trainer_off(object):
 
                     logger.log("Obtaining samples...")
                     time_env_sampling_start = time.time()
-                    paths = self.sampler.obtain_samples(tasks_id, step_id=step, log=True, log_prefix='Step_%d-' % step)
+                    if step == 0:
+                        paths_step_0 = self.sampler.obtain_samples(tasks_id, step_id=step, log=True, log_prefix='Step_%d-' % step)
+                    elif step ==1:
+                        paths_step_1 = self.sampler.obtain_samples(tasks_id, step_id=step, log=True, log_prefix='Step_%d-' % step)
+
                     list_sampling_time.append(time.time() - time_env_sampling_start)
-                    all_paths.append(paths)
+                    if step   == 0:
+                        all_paths.append(paths_step_0)
+                    elif step == 1:
+                        all_paths.append(paths_step_1)
 
                     """ ----------------- Processing Samples ---------------------"""
 
@@ -108,13 +117,20 @@ class Trainer_off(object):
                     time_proc_samples_start = time.time()
                     if step   == 0:
                         off_sample_path                   = self.sampler.buffer.sample(tasks_id, self.sample_batch_size)
-                        samples_data, off_sample_data     = self.sample_processor.process_samples(off_sample = off_sample_path, paths_meta_batch=paths, log='all', log_prefix='Step_%d-' % step)
+                        samples_data_step_0, off_sample_data     = self.sample_processor.process_samples(off_sample = off_sample_path, paths_meta_batch=paths_step_0, log='all', log_prefix='Step_%d-' % step)
                     elif step == 1:
-                        samples_data,_                    = self.sample_processor.process_samples(off_sample = None, paths_meta_batch=paths, log='all', log_prefix='Step_%d-' % step)
-                    all_samples_data.append(samples_data)
-                    list_proc_samples_time.append(time.time() - time_proc_samples_start)
+                        samples_data_step_1, _                    = self.sample_processor.process_samples(off_sample = None,            paths_meta_batch=paths_step_1, log='all', log_prefix='Step_%d-' % step)
+                    if step   == 0:
+                        all_samples_data.append(samples_data_step_0)
+                    elif step == 1:
+                        all_samples_data.append(samples_data_step_1)
 
-                    self.log_diagnostics(sum(list(paths.values()), []), prefix='Step_%d-' % step)
+                    list_proc_samples_time.append(time.time() - time_proc_samples_start)
+                    
+                    if step   == 0:
+                        self.log_diagnostics(sum(list(paths_step_0.values()), []), prefix='Step_%d-' % step)
+                    elif step == 1:
+                        self.log_diagnostics(sum(list(paths_step_1.values()), []), prefix='Step_%d-' % step)
 
                     """ ------------------- Inner Policy Update --------------------"""
 
@@ -122,11 +138,33 @@ class Trainer_off(object):
                     if step < self.num_inner_grad_steps:
                         logger.log("Computing inner policy updates...")
                         
-                        self.algo._adapt_off(samples_data, off_sample_data)
+                        self.algo._adapt_off(samples_data_step_0, off_sample_data)
 
                     list_inner_step_time.append(time.time() - time_inner_step_start)
 
                 all_samples_data.append(off_sample_data)
+
+                test_time_inner_step_start = time.time()
+
+                logger.log('** test **')
+                self.policy.switch_to_pre_update()
+
+                """ ------------------- Inner Policy Update --------------------"""
+                logger.log("test-Computing inner policy updates...")
+                self.algo._adapt(samples_data_step_0)
+
+                """ -------------------- Sampling --------------------------"""
+                logger.log("test-Obtaining samples...")
+                test_paths_step_1             = self.sampler.obtain_samples(tasks_id, step_id=1, log=True, log_prefix='test-Step_%d-' % 1)
+                
+                """ ----------------- Processing Samples ---------------------"""
+                logger.log("test-Processing samples...")
+                test_samples_data_step_1      = self.sample_processor.test_process_samples_fit(test_paths_step_1, log='all', log_prefix='test-Step_%d-' % 1)
+
+
+                list_inner_step_time.append(time.time() - test_time_inner_step_start)
+
+
 
                 total_inner_time = time.time() - start_total_inner_time
 
@@ -137,6 +175,8 @@ class Trainer_off(object):
                 # This needs to take all samples_data so that it can construct graph for meta-optimization.
                 time_outer_step_start = time.time()
                 self.algo.optimize_policy(all_samples_data)
+
+
 
                 """ ------------------- Logging Stuff --------------------------"""
                 logger.logkv('Itr', itr)

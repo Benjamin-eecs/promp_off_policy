@@ -221,26 +221,26 @@ class MAMLAlgo(MetaAlgo):
             adapt_input_list_ph (list): list of placeholders
 
         """
-        obs_phs, action_phs, adv_phs, dist_info_old_phs, adapt_input_ph_dict = self._make_input_placeholders('adapt')
+        test_obs_phs, test_action_phs, test_adv_phs, test_dist_info_old_phs, test_adapt_input_ph_dict = self._make_input_placeholders('test_adapt')
 
-        adapted_policies_params = []
+        test_adapted_policies_params = []
 
         for i in range(self.meta_batch_size):
-            with tf.variable_scope("adapt_task_%i" % i):
-                with tf.variable_scope("adapt_objective"):
-                    distribution_info_new = self.policy.distribution_info_sym(obs_phs[i],
-                                                                              params=self.policy.policies_params_phs[i])
+            with tf.variable_scope("test_adapt_task_%i" % i):
+                with tf.variable_scope("test_adapt_objective"):
+                    test_distribution_info_new = self.policy.distribution_info_sym(test_obs_phs[i],
+                                                                                   params=self.policy.policies_params_phs[i])
 
                     # inner surrogate objective
-                    surr_obj_adapt = self._adapt_objective_sym(action_phs[i], adv_phs[i],
-                                                               dist_info_old_phs[i], distribution_info_new)
+                    test_surr_obj_adapt        = self._adapt_objective_sym(test_action_phs[i], test_adv_phs[i],
+                                                                           test_dist_info_old_phs[i], test_distribution_info_new)
 
                 # get tf operation for adapted (post-update) policy
-                with tf.variable_scope("adapt_step"):
-                    adapted_policy_param = self._adapt_sym(surr_obj_adapt, self.policy.policies_params_phs[i])
-                adapted_policies_params.append(adapted_policy_param)
+                with tf.variable_scope("test_adapt_step"):
+                    test_adapted_policy_param = self._adapt_sym(test_surr_obj_adapt, self.policy.policies_params_phs[i])
+                test_adapted_policies_params.append(test_adapted_policy_param)
 
-        return adapted_policies_params, adapt_input_ph_dict
+        return test_adapted_policies_params, test_adapt_input_ph_dict
 
 
     def _adapt_sym(self, surr_obj, params_var):
@@ -281,19 +281,19 @@ class MAMLAlgo(MetaAlgo):
         sess = tf.get_default_session()
 
         # prepare feed dict
-        input_dict = self._extract_input_dict(samples, self._optimization_keys, prefix='adapt')
-        input_ph_dict = self.adapt_input_ph_dict
+        test_input_dict       = self._extract_input_dict(samples, self._optimization_keys, prefix='test_adapt')
+        test_input_ph_dict    = self.test_adapt_input_ph_dict
 
-        feed_dict_inputs = utils.create_feed_dict(placeholder_dict=input_ph_dict, value_dict=input_dict)
-        feed_dict_params = self.policy.policies_params_feed_dict
+        test_feed_dict_inputs = utils.create_feed_dict(placeholder_dict=test_input_ph_dict, value_dict=test_input_dict)
+        test_feed_dict_params = self.policy.policies_params_feed_dict
 
-        feed_dict = {**feed_dict_inputs, **feed_dict_params}  # merge the two feed dicts
+        test_feed_dict = {**test_feed_dict_inputs, **test_feed_dict_params}  # merge the two feed dicts
 
         # compute the post-update / adapted policy parameters
-        adapted_policies_params_vals = sess.run(self.adapted_policies_params, feed_dict=feed_dict)
+        test_adapted_policies_params_vals = sess.run(self.test_adapted_policies_params, feed_dict=test_feed_dict)
 
         # store the new parameter values in the policy
-        self.policy.update_task_parameters(adapted_policies_params_vals)
+        self.policy.update_task_parameters(test_adapted_policies_params_vals)
 
 
 

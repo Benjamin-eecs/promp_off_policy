@@ -97,6 +97,8 @@ class ProMP_off(MAMLAlgo):
             # this graph is only used for adapting the policy and not computing the meta-updates
             self.adapted_policies_params, self.adapt_input_ph_dict, self.adapt_input_ph_dict_off = self._build_inner_adaption_off()
 
+            self.test_adapted_policies_params, self.test_adapt_input_ph_dict = self._build_inner_adaption()
+
             """ ----- Build graph for the meta-update ----- """
             self.meta_op_phs_dict = OrderedDict()
             obs_phs, action_phs, adv_phs, dist_info_old_phs, all_phs_dict                     = self._make_input_placeholders('step0')

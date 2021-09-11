@@ -107,7 +107,7 @@ if __name__=="__main__":
     parser.add_argument('--dump_path', type=str, default=meta_policy_search_path + '/data/pro-mp/run_%d' % idx)
 
     args = parser.parse_args()
-    args.dump_path = '/home/liubo/promp_liubo/ProMP' + '/data/pro-mp/test_params_%d_seed_%d' % (args.sampler, args.seed)
+    args.dump_path = '/home/liubo/promp_all/ProMP' + '/data/pro-mp/test_params_%d_seed_%d' % (args.sampler, args.seed)
 
     if args.config_file: # load configuration from json file
         with open(args.config_file, 'r') as f:

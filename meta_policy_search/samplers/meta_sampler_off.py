@@ -124,6 +124,7 @@ class ReplayBuffer(object):
 
         paths = OrderedDict()
         for meta_id, task_id in enumerate(tasks_id):
+
             if N > (min(self.filled_i) // self.traj_len)-1:
                 inds = np.random.choice(np.arange((min(self.filled_i) // self.traj_len)-1), size=N, replace=True)
             elif N <= (min(self.filled_i) // self.traj_len)-1:
