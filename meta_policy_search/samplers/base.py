@@ -132,52 +132,6 @@ class SampleProcessor(object):
 
         return samples_data, paths
 
-    def _compute_samples_data_fit(self, paths):
-        assert type(paths) == list
-        for idx, path in enumerate(paths):
-            path["returns"] = utils.discount_cumsum(path["rewards"], self.discount)
-        self.baseline.fit(paths, target_key="returns")
-        all_path_baselines = [self.baseline.predict(path) for path in paths]
-        paths = self._compute_advantages(paths, all_path_baselines)
-        observations, actions, rewards, returns, advantages, env_infos, agent_infos = self._stack_path_data(paths)
-        if self.normalize_adv:
-            advantages = utils.normalize_advantages(advantages)
-        if self.positive_adv:
-            advantages = utils.shift_advantages_to_positive(advantages)
-        samples_data = dict(
-                observations=observations,
-                actions=actions,
-                rewards=rewards,
-                advantages=advantages,
-                env_infos=env_infos,
-                agent_infos=agent_infos,
-        )
-        return samples_data, paths
-
-
-    def _compute_samples_data_no_fit(self, paths):
-        assert type(paths) == list
-        for idx, path in enumerate(paths):
-            path["returns"] = utils.discount_cumsum(path["rewards"], self.discount)
-        
-        all_path_baselines = [self.baseline.predict(path) for path in paths]
-        paths = self._compute_advantages(paths, all_path_baselines)
-        observations, actions, rewards, returns, advantages, env_infos, agent_infos = self._stack_path_data(paths)
-        if self.normalize_adv:
-            advantages = utils.normalize_advantages(advantages)
-        if self.positive_adv:
-            advantages = utils.shift_advantages_to_positive(advantages)
-        samples_data = dict(
-                observations=observations,
-                actions=actions,
-                rewards=rewards,
-                advantages=advantages,
-                env_infos=env_infos,
-                agent_infos=agent_infos,
-        )
-        return samples_data, paths
-
-
 
     def _compute_samples_data_off(self, paths):
         assert type(paths) == list
