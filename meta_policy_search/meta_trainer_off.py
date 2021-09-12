@@ -42,6 +42,7 @@ class Trainer_off(object):
             start_itr=0,
             num_inner_grad_steps=1,
             sample_batch_size=32,
+            seeds            = [0]*4*5,
             sess=None,
             ):
         self.algo = algo
@@ -54,6 +55,7 @@ class Trainer_off(object):
         self.start_itr = start_itr
         self.num_inner_grad_steps = num_inner_grad_steps
         self.sample_batch_size    = sample_batch_size
+        self.seeds                = seeds
         if sess is None:
             sess = tf.Session()
         self.sess = sess
@@ -71,6 +73,8 @@ class Trainer_off(object):
                 algo.optimize_policy()
                 sampler.update_goals()
         """
+        self.sampler.set_seeds(self.seeds)
+
         with self.sess.as_default() as sess:
 
             # initialize uninitialized vars  (only initialize vars that were not loaded)

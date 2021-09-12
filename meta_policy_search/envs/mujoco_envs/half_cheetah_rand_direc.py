@@ -6,12 +6,16 @@ from gym.envs.mujoco.mujoco_env import MujocoEnv
 
 
 class HalfCheetahRandDirecEnv(MetaEnv, MujocoEnv, gym.utils.EzPickle):
-    def __init__(self, goal_direction=None):
+    def __init__(self, seed, goal_direction=None):
         self.goal_direction = goal_direction if goal_direction else 1.0
         MujocoEnv.__init__(self, 'half_cheetah.xml', 5)
         gym.utils.EzPickle.__init__(self, goal_direction)
         self.tasks = np.array([-1.0, 1.0])
+       
+        self.seed(seed)
 
+    def set_seed(self, seed):
+        seld.seed(seed)
 
 
     def sample_tasks(self, n_tasks):

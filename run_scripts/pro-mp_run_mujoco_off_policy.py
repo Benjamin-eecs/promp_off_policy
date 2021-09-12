@@ -31,7 +31,8 @@ def main(config):
 
     baseline =  globals()[config['baseline']]() #instantiate baseline
 
-    env = globals()[config['env']]() # instantiate env
+    env = globals()[config['env']](config['seed']) # instantiate env
+
     env = normalize(env) # apply normalize wrapper to env
 
     policy = MetaGaussianMLPPolicy(
@@ -83,7 +84,8 @@ def main(config):
         sample_processor=sample_processor,
         n_itr=config['n_itr'],
         num_inner_grad_steps= config['num_inner_grad_steps'],
-        sample_batch_size   = config['sample_batch_size']
+        sample_batch_size   = config['sample_batch_size'],
+        seeds               = [config['seed']] * config['rollouts_per_meta_task'] * config['meta_batch_size']
     )
 
     trainer.train()

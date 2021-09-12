@@ -180,6 +180,21 @@ class MetaParallelEnvExecutor(object):
         for remote in self.remotes:
             remote.recv()
 
+
+    def set_seeds(self, seeds=None):
+        """
+        Sets a list of tasks to each worker
+
+        Args:
+            tasks (list): list of the tasks for each worker
+        """
+        for remote, seed in zip(self.remotes, seeds):
+            remote.send(('set_seed', seed))
+        for remote in self.remotes:
+            remote.recv()
+
+
+
     def get_tasks(self):
         for remote in self.remotes:
             remote.send(('get_task', None))
@@ -253,6 +268,10 @@ def worker(remote, parent_remote, env_pickle, n_envs, max_path_length, seed):
             tasks = [env.get_task() for env in envs]
             remote.send(tasks)
 
+        elif cmd == 'set_seed':
+            for env in envs:
+                env.set_seed(data)
+            remote.send(None)
 
         else:
             raise NotImplementedError
