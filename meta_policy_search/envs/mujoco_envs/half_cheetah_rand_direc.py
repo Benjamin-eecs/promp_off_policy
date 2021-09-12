@@ -15,7 +15,7 @@ class HalfCheetahRandDirecEnv(MetaEnv, MujocoEnv, gym.utils.EzPickle):
         self.seed(seed)
 
     def set_seed(self, seed):
-        seld.seed(seed)
+        self.seed(seed)
 
 
     def sample_tasks(self, n_tasks):
