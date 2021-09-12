@@ -77,7 +77,8 @@ class ProMP_off(MAMLAlgo):
         with tf.variable_scope("surrogate_loss"):
             clip_obj_adapt = tf.minimum(likelihood_ratio_adapt *adv_sym,
                                          tf.clip_by_value(likelihood_ratio_adapt,
-                                                          1 - self.off_clip_eps,
+                                                          #1 - self.off_clip_eps,
+                                                          0,
                                                           1 + self.off_clip_eps) * adv_sym)
             surr_obj_adapt = -tf.reduce_mean(clip_obj_adapt)
         return surr_obj_adapt
@@ -133,6 +134,8 @@ class ProMP_off(MAMLAlgo):
                     surr_loss_off      = self._adapt_objective_sym_off(action_phs_off[i], adv_phs_off[i], dist_info_old_phs_off[i], distribution_info_vars_off[i])
 
                     kl_loss            = tf.reduce_mean(self.policy.distribution.kl_sym(dist_info_old_phs[i], distribution_info_vars[i]))
+                    
+                    #kl_loss_off = tf.reduce_mean(self.policy.distribution.kl_sym(dist_info_old_phs_off[i], distribution_info_vars[i]))
 
                     surr_loss_all      = 0.5 * surr_loss + 0.5 * surr_loss_off
                     adapted_params_var = self._adapt_sym(surr_loss_all, current_policy_params[i])

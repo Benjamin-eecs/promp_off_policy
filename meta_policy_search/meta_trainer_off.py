@@ -159,12 +159,10 @@ class Trainer_off(object):
                 
                 """ ----------------- Processing Samples ---------------------"""
                 logger.log("test-Processing samples...")
-                test_samples_data_step_1      = self.sample_processor.test_process_samples_fit(test_paths_step_1, log='all', log_prefix='test-Step_%d-' % 1)
+                test_samples_data_step_1      = self.sample_processor.process_samples(off_sample = None, paths_meta_batch=test_paths_step_1, log='all', log_prefix='test-Step_%d-' % 1)
 
 
                 list_inner_step_time.append(time.time() - test_time_inner_step_start)
-
-
 
                 total_inner_time = time.time() - start_total_inner_time
 
