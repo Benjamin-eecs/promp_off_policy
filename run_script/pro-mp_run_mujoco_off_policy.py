@@ -25,6 +25,7 @@ import time
 meta_policy_search_path = '/'.join(os.path.realpath(os.path.dirname(__file__)).split('/')[:-1])
 
 
+
 def main(config):
     set_seed(config['seed'])
 
@@ -73,7 +74,9 @@ def main(config):
         target_inner_step          =config['target_inner_step'],
         init_inner_kl_penalty      =config['init_inner_kl_penalty'],
         adaptive_inner_kl_penalty  =config['adaptive_inner_kl_penalty'],
-        off_clip_eps               =config['off_clip_eps']
+        off_clip_eps_upper         =config['off_clip_eps_upper'],
+        off_clip_eps_lower         =config['off_clip_eps_lower'],
+        clip_style                 =config['clip_style']                 #0:TRPO 1:off policy pg
     )
 
     trainer = Trainer_off(
@@ -83,9 +86,10 @@ def main(config):
         sampler=sampler,
         sample_processor=sample_processor,
         n_itr=config['n_itr'],
+        seeds               = [config['seed']] * config['rollouts_per_meta_task'] * config['meta_batch_size'],
         num_inner_grad_steps= config['num_inner_grad_steps'],
         sample_batch_size   = config['sample_batch_size'],
-        seeds               = [config['seed']] * config['rollouts_per_meta_task'] * config['meta_batch_size']
+        
     )
 
     trainer.train()
@@ -113,11 +117,13 @@ if __name__=="__main__":
     parser.add_argument('--dump_path', type=str, default= './data/pro-mp-off/run_%d' % idx)
 
     args = parser.parse_args()
-    #args.dump_path = '/home/liubo/promp_all/ProMP' + '/data/pro-mp/test_params_%d_seed_%d' % (args.sampler, args.seed)
+    args.dump_path = meta_policy_search_path + '/data/pro-mp/test_params_%d_seed_%d' % (args.sampler, args.seed)
 
     if args.config_file: # load configuration from json file
         with open(args.config_file, 'r') as f:
             config = json.load(f)
+
+
 
     else: # use default config
 
@@ -126,12 +132,13 @@ if __name__=="__main__":
 
             'sampler' : args.sampler,
             #off_policy config
-
             'num_tasks'                           : 2,
 
-            'buffer_length'                       : 10000, # meta_batch_size * rollout_per_task * max_path_length *constant
-            'sample_batch_size'                   : 60,    # for each meta task
-            'off_clip_eps'                        : 3,
+            'buffer_length'                       : 4000, # meta_batch_size * rollout_per_task * max_path_length *constant
+            'sample_batch_size'                   : 40,    # for each meta task
+            'off_clip_eps_upper'                  : 0.8,
+            'off_clip_eps_lower'                  : 1,
+            'clip_style'                          : 0,
 
 
             'baseline'                            : 'LinearFeatureBaseline',

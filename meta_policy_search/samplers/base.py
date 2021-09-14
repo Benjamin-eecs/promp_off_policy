@@ -1,6 +1,6 @@
 from meta_policy_search.utils import utils, logger
 import numpy as np
-
+import wandb
 
 class Sampler(object):
     """
@@ -16,9 +16,9 @@ class Sampler(object):
     def __init__(self, env, policy, batch_size, max_path_length):
         assert hasattr(env, 'reset') and hasattr(env, 'step')
 
-        self.env = env
-        self.policy = policy
-        self.batch_size = batch_size
+        self.env             = env
+        self.policy          = policy
+        self.batch_size      = batch_size
         self.max_path_length = max_path_length
 
     def obtain_samples(self):
@@ -63,6 +63,8 @@ class SampleProcessor(object):
         self.gae_lambda = gae_lambda
         self.normalize_adv = normalize_adv
         self.positive_adv = positive_adv
+        self.Step_1_AverageReturn      = []
+        self.test_Step_1_AverageReturn = []
 
     def process_samples(self, paths, log=False, log_prefix=''):
         """
@@ -171,7 +173,7 @@ class SampleProcessor(object):
     def _log_path_stats(self, paths, log=False, log_prefix=''):
         # compute log stats
         average_discounted_return = np.mean([path["returns"][0] for path in paths])
-        undiscounted_returns = [sum(path["rewards"]) for path in paths]
+        undiscounted_returns      = [sum(path["rewards"]) for path in paths]
 
         if log == 'reward':
             logger.logkv(log_prefix + 'AverageReturn', np.mean(undiscounted_returns))
@@ -183,6 +185,8 @@ class SampleProcessor(object):
             logger.logkv(log_prefix + 'StdReturn', np.std(undiscounted_returns))
             logger.logkv(log_prefix + 'MaxReturn', np.max(undiscounted_returns))
             logger.logkv(log_prefix + 'MinReturn', np.min(undiscounted_returns))
+
+        return np.mean(undiscounted_returns)
 
     def _compute_advantages(self, paths, all_path_baselines):
         assert len(paths) == len(all_path_baselines)

@@ -39,7 +39,9 @@ class ProMP_off(MAMLAlgo):
             init_inner_kl_penalty=1e-2,
             adaptive_inner_kl_penalty=True,
             anneal_factor=1.0,
-            off_clip_eps = 0.3,
+            off_clip_eps_upper = 0.6,
+            off_clip_eps_lower = 0.6,
+            clip_style         = 0,
             **kwargs
             ):
         super(ProMP_off, self).__init__(*args, **kwargs)
@@ -47,7 +49,9 @@ class ProMP_off(MAMLAlgo):
         self.optimizer = MAMLPPOOptimizer(learning_rate=learning_rate, max_epochs=num_ppo_steps, num_minibatches=num_minibatches)
         self.clip_eps = clip_eps
 
-        self.off_clip_eps = off_clip_eps
+        self.off_clip_eps_upper   = off_clip_eps_upper
+        self.off_clip_eps_lower   = off_clip_eps_lower
+        self.clip_style           = clip_style
 
 
         self.target_inner_step = target_inner_step
@@ -74,14 +78,28 @@ class ProMP_off(MAMLAlgo):
         with tf.variable_scope("likelihood_ratio"):
             likelihood_ratio_adapt = self.policy.distribution.likelihood_ratio_sym(action_sym,
                                                                                    dist_info_old_sym, dist_info_new_sym)
+
+        with tf.variable_scope("log_likelihood"):
+            log_likelihood_adapt   = self.policy.distribution.log_likelihood_sym(action_sym, dist_info_new_sym)
+
+
         with tf.variable_scope("surrogate_loss"):
-            clip_obj_adapt = tf.minimum(likelihood_ratio_adapt *adv_sym,
-                                         tf.clip_by_value(likelihood_ratio_adapt,
-                                                          #1 - self.off_clip_eps,
-                                                          0,
-                                                          1 + self.off_clip_eps) * adv_sym)
-            surr_obj_adapt = -tf.reduce_mean(clip_obj_adapt)
-        return surr_obj_adapt
+            clip_obj_adapt_0              = tf.minimum(likelihood_ratio_adapt *adv_sym,
+                                                          tf.clip_by_value(likelihood_ratio_adapt,
+                                                          1 - self.off_clip_eps_lower,
+                                                          1 + self.off_clip_eps_upper) * adv_sym)
+
+            surr_obj_adapt_0              = -tf.reduce_mean(clip_obj_adapt_0)
+
+            clip_likelihood_ratio_adapt   = tf.clip_by_value(likelihood_ratio_adapt,
+                                                             0,
+                                                             1 + self.off_clip_eps_upper)
+            clip_obj_adapt_1              =  tf.stop_gradient(clip_likelihood_ratio_adapt) * log_likelihood_adapt * adv_sym
+            surr_obj_adapt_1              = -tf.reduce_mean(clip_obj_adapt_1)
+        if self.clip_style == 0:
+            return surr_obj_adapt_0
+        elif self.clip_style == 1:
+            return surr_obj_adapt_1
 
 
 

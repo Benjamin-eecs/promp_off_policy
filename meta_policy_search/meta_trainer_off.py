@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import time
 from meta_policy_search.utils import logger
-
+import wandb
 
 class Trainer_off(object):
     """
@@ -39,10 +39,11 @@ class Trainer_off(object):
             sample_processor,
             policy,
             n_itr,
+            seeds,
+
             start_itr=0,
             num_inner_grad_steps=1,
             sample_batch_size=32,
-            seeds            = [0]*4*5,
             sess=None,
             ):
         self.algo = algo
@@ -202,7 +203,15 @@ class Trainer_off(object):
                 logger.dumpkvs()
 
         logger.log("Training finished")
-        self.sess.close()        
+        res      = np.array(self.sample_processor.Step_1_AverageReturn)
+        test_res = np.array(self.sample_processor.test_Step_1_AverageReturn)
+
+        res_dict = dict([('Step_1-AverageReturn',res),
+                         ('test-Step_1-AverageReturn',test_res)])
+        self.sess.close()
+        tf.reset_default_graph()
+         
+        return res_dict      
 
     def get_itr_snapshot(self, itr):
         """
